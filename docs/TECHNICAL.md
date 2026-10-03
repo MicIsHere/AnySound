@@ -82,6 +82,8 @@ java -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED -jar anysound-laun
 
 Paths are resolved relative to the Launcher JAR, so launching from another working directory or a path containing spaces or Chinese characters is supported. The default host package contains only that host's native libraries. The Windows target selects Windows Skiko, sherpa-onnx, and LWJGL native libraries; copying a host Mac package to Windows is insufficient.
 
+On Windows, Java 21's `java.exe` converts command-line arguments using the system ANSI code page. Characters outside that code page can become `?` before the Launcher runs; `-Dfile.encoding=UTF-8` does not change this conversion. For a Chinese installation path on an English Windows system, change to the Launcher directory first and use the relative JAR name shown above. Unicode paths and resources inside the JVM are still supported.
+
 Check the layout without opening a window:
 
 ```powershell
@@ -128,7 +130,7 @@ Every push to `stable` triggers the [Windows stable release workflow](../.github
 The Windows x64 job:
 
 1. Installs Temurin JDK 21 and runs a clean build, the regular tests, `portableZip`, and `launcherZip`.
-2. Extracts both ZIPs and runs Launcher `--check` through the bundled Windows executable and the installed Java runtime respectively. These are layout/entry-point checks, not GPU or hardware acceptance.
+2. Extracts both ZIPs into paths containing spaces and Chinese characters, then runs Launcher `--check` through the bundled Windows executable and the installed Java runtime respectively. These are layout/entry-point checks, not GPU or hardware acceptance.
 3. Generates `SHA256SUMS.txt` and uploads the packages as Actions artifacts. Test reports from both modules are uploaded even if the build fails.
 4. Creates a draft Release for the exact built commit, uploads both ZIPs and checksums, then publishes it as the latest stable release.
 
@@ -300,6 +302,8 @@ Run the regular suite on the host platform:
 ```
 
 On macOS/Linux, use `./gradlew test`. Tests include the Launcher module and do not require a headset, API Key, or microphone. Coverage includes text cleanup, Unicode splitting, settings compatibility, IME commit protection, real loopback UDP, queue timing/cancellation, recording lifecycle and late callbacks, audio format conversion, SteamVR registration helpers, and overlay rendering.
+
+Launcher subprocess tests keep command-line arguments in ASCII to accommodate Java 21's Windows launcher, while retaining Chinese installation directories, nested library paths, filenames, and resource contents. They use a different working directory from the Launcher directory to check JAR-relative resolution. Child JVMs explicitly set `stdout.encoding` and `stderr.encoding` to UTF-8, matching the test output reader; `file.encoding` alone does not control Windows console output encoding.
 
 Regular overlay checks use a Skia software surface to verify redraws, transparency, animations, and residual pixels. Generated images are under `build/reports/tests/overlay-*.png`. Software rendering does not validate the Windows GPU or OpenVR compositor.
 

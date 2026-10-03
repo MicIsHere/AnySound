@@ -21,14 +21,14 @@ class LauncherTest {
             Path base = Files.createDirectories(temp.resolve("中文 launcher " + packaged));
             Path payload = packaged ? Files.createDirectories(base.resolve("Compose app resources")) : base;
             fixture(base, payload);
-            Path marker = base.resolve("结果.txt");
-            Result result = launch(base, payload, packaged, marker.toString(), "你好 with spaces");
+            Path outputDirectory = Files.createDirectories(base.resolve("output files"));
+            Result result = launch(base, payload, packaged, "../output files", "argument with spaces");
             assertEquals(0, result.exit, result.output);
-            assertEquals("late dependency/你好 with spaces/resource 中文", Files.readString(marker));
-            assertFalse(result.output.contains("你好 with spaces"), "Launcher 不记录传入参数");
+            assertEquals("late dependency/argument with spaces/resource 中文", Files.readString(outputDirectory.resolve("结果.txt")));
+            assertFalse(result.output.contains("argument with spaces"), "Launcher 不记录传入参数");
             Result check = launch(base, payload, packaged, "--check");
             assertEquals(0, check.exit, check.output);
-            assertTrue(check.output.contains("AnySound launcher check passed"));
+            assertTrue(check.output.contains("AnySound launcher check passed"), check.output);
         }
     }
 
@@ -36,14 +36,14 @@ class LauncherTest {
         Path base = Files.createDirectories(temp.resolve("broken installation"));
         Files.copy(Path.of(System.getProperty("anysound.testLauncher")), base.resolve("anysound-launcher.jar"));
         Result missing = launch(base, base, false);
-        assertEquals(1, missing.exit);
-        assertTrue(missing.output.contains("缺少 anysound-main.jar 或 libs 目录"));
+        assertEquals(1, missing.exit, missing.output);
+        assertTrue(missing.output.contains("缺少 anysound-main.jar 或 libs 目录"), missing.output);
         assertFalse(Files.exists(base.resolve("libs")), "不能把缺失的 libs 创建为普通文件");
         fixture(base, base);
         Result failed = launch(base, base, false, "fail");
-        assertEquals(1, failed.exit);
-        assertTrue(failed.output.contains("IllegalStateException: expected startup failure"));
-        assertFalse(failed.output.contains("InvocationTargetException"));
+        assertEquals(1, failed.exit, failed.output);
+        assertTrue(failed.output.contains("IllegalStateException: expected startup failure"), failed.output);
+        assertFalse(failed.output.contains("InvocationTargetException"), failed.output);
         try (var logs = Files.list(base.resolve("profile/logs/launch"))) {
             assertEquals(2, logs.count());
         }
@@ -55,10 +55,10 @@ class LauncherTest {
         Files.delete(base.resolve("libs/fixture-natives.jar"));
         Result result = launch(base, base, false, "--check");
         assertEquals(1, result.exit, result.output);
-        assertTrue(result.output.contains("界面原生库"));
-        assertTrue(result.output.contains(".sha256"));
-        assertFalse(result.output.contains("AnySound launcher check passed"));
-        assertFalse(result.output.contains("Starting AnySound..."));
+        assertTrue(result.output.contains("界面原生库"), result.output);
+        assertTrue(result.output.contains(".sha256"), result.output);
+        assertFalse(result.output.contains("AnySound launcher check passed"), result.output);
+        assertFalse(result.output.contains("Starting AnySound..."), result.output);
     }
 
     @Test void windowsPreflightRejectsMacNativesAndHandlesExtractedNativePath() throws Exception {
@@ -109,7 +109,7 @@ class LauncherTest {
                                 var loader = Thread.currentThread().getContextClassLoader();
                                 var message = loader.loadClass("fixture.Delayed").getMethod("message").invoke(null);
                                 try (var stream = loader.getResourceAsStream("probe.txt")) {
-                                    java.nio.file.Files.writeString(java.nio.file.Path.of(args[0]), message + "/" + args[1]
+                                    java.nio.file.Files.writeString(java.nio.file.Path.of(args[0]).resolve("结果.txt"), message + "/" + args[1]
                                             + "/" + new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
                                 }
                             } catch (Exception error) { throw new RuntimeException(error); }
@@ -149,20 +149,27 @@ class LauncherTest {
 
     private Result launch(Path base, Path payload, boolean packaged, String... args) throws Exception {
         boolean windows = System.getProperty("os.name").startsWith("Windows");
+        // Windows Java 21 converts command-line arguments through the system ANSI code page.
+        // Keep argv ASCII, but still exercise Unicode installation/resource/output paths and
+        // a working directory different from the Launcher directory. ProcessBuilder sets cwd
+        // through the Unicode Windows API without putting that path in Java's command line.
+        Path cwd = Files.createDirectories(base.resolve("unrelated cwd"));
+        Path relativeBase = cwd.relativize(base);
+        Path relativePayload = cwd.relativize(payload);
         List<String> command = new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString(),
-                "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true", "-Danysound.dataDir=" + base.resolve("profile")));
-        if (packaged) command.add("-Dcompose.application.resources.dir=" + payload);
+                "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8",
+                "-Djava.awt.headless=true", "-Danysound.dataDir=" + relativeBase.resolve("profile")));
+        if (packaged) command.add("-Dcompose.application.resources.dir=" + relativePayload);
         if (packaged) {
             // jpackage discovers resource JARs and adds them to the system classpath.
-            command.addAll(List.of("-cp", base.resolve("anysound-launcher.jar") + java.io.File.pathSeparator
-                    + payload.resolve("anysound-main.jar"), "tech.origin.launch.Main"));
-        } else command.addAll(List.of("-jar", base.resolve("anysound-launcher.jar").toString()));
+            command.addAll(List.of("-cp", relativeBase.resolve("anysound-launcher.jar") + java.io.File.pathSeparator
+                    + relativePayload.resolve("anysound-main.jar"), "tech.origin.launch.Main"));
+        } else command.addAll(List.of("-jar", relativeBase.resolve("anysound-launcher.jar").toString()));
         command.addAll(List.of(args));
         Path output = Files.createTempFile(temp, "process-", ".txt");
-        Path cwd = Files.createDirectories(temp.resolve("unrelated cwd"));
         Process process = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
         try {
-            assertTrue(process.waitFor(20, TimeUnit.SECONDS), "Launcher timed out");
+            assertTrue(process.waitFor(20, TimeUnit.SECONDS), "Launcher timed out; output: " + output);
             return new Result(process.exitValue(), Files.readString(output));
         } finally { if (process.isAlive()) process.destroyForcibly(); }
     }

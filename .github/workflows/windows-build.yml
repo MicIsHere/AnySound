@@ -36,7 +36,7 @@ jobs:
         run: .\gradlew.bat clean test portableZip launcherZip --no-daemon
       - name: Check extracted packages
         env:
-          JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
+          JAVA_TOOL_OPTIONS: -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
         run: |
           $ErrorActionPreference = 'Stop'
           $packages = @(Get-ChildItem build/distributions/*-windows-x64.zip)
@@ -44,14 +44,21 @@ jobs:
           if ($packages.Count -ne 1 -or $launchers.Count -ne 1) {
             throw 'Expected one portable ZIP and one Launcher ZIP.'
           }
-          $portableDir = Join-Path $env:RUNNER_TEMP 'AnySound portable'
-          $launcherDir = Join-Path $env:RUNNER_TEMP 'AnySound launcher'
+          $portableDir = Join-Path $env:RUNNER_TEMP 'AnySound portable 中文'
+          $launcherDir = Join-Path $env:RUNNER_TEMP 'AnySound launcher 中文'
           Expand-Archive $packages[0].FullName $portableDir
           Expand-Archive $launchers[0].FullName $launcherDir
           $app = Start-Process (Join-Path $portableDir 'AnySound/AnySound.exe') -ArgumentList '--check' -Wait -PassThru
           if ($app.ExitCode -ne 0) { throw "Portable preflight failed: $($app.ExitCode)" }
-          & java -jar (Join-Path $launcherDir 'AnySound/anysound-launcher.jar') --check
-          if ($LASTEXITCODE -ne 0) { throw 'Launcher preflight failed.' }
+          # Java 21's Windows command line uses the system ANSI code page. Set the
+          # Unicode working directory in PowerShell, then pass an ASCII JAR name.
+          Push-Location (Join-Path $launcherDir 'AnySound')
+          try {
+            & java -jar anysound-launcher.jar --check
+            if ($LASTEXITCODE -ne 0) { throw 'Launcher preflight failed.' }
+          } finally {
+            Pop-Location
+          }
           Get-ChildItem build/distributions/*.zip | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
