@@ -110,6 +110,8 @@ Run on **Windows x64 with JDK 21**:
 
 The current output is `build\distributions\AnySound-0.1.0-windows-x64.zip`. Extract it and run `AnySound\AnySound.exe`. The ZIP includes the Java runtime, application, Compose, speech and OpenVR native dependencies, user guide, and the `docs` directory. Speech models are downloaded or imported separately. The package does not install SteamVR or configure startup at login.
 
+Use an ASCII installation path such as `C:\Apps\AnySound` for portability across Windows locales. Java 21's native `jpackage` launcher also converts expanded JVM arguments, including its classpath, through the system ANSI code page. Changing the working directory does not fix an EXE installed in a path that this code page cannot represent. This is separate from the standalone JAR's relative-path workaround above; `file.encoding` and console output encoding settings do not fix it.
+
 `createDistributable` builds the host application image under `build/compose/binaries/main/app`. macOS cannot cross-build the Windows jpackage image or the runtime-bundled Windows ZIP.
 
 ## Branches and releases
@@ -130,8 +132,8 @@ Every push to `stable` triggers the [Windows stable release workflow](../.github
 The Windows x64 job:
 
 1. Installs Temurin JDK 21 and runs a clean build, the regular tests, `portableZip`, and `launcherZip`.
-2. Extracts both ZIPs into paths containing spaces and Chinese characters, then runs Launcher `--check` through the bundled Windows executable and the installed Java runtime respectively. These are layout/entry-point checks, not GPU or hardware acceptance.
-3. Generates `SHA256SUMS.txt` and uploads the packages as Actions artifacts. Test reports from both modules are uploaded even if the build fails.
+2. Extracts the portable ZIP into an ASCII path containing spaces and runs `AnySound.exe --check` with the bundled runtime, with a 60-second timeout. The standalone Launcher is checked in a path containing spaces and Chinese characters, using a relative JAR filename. These are layout/entry-point checks, not GPU or hardware acceptance.
+3. Generates `SHA256SUMS.txt` and uploads the packages as Actions artifacts. Test reports from both modules and `package-check-logs` are uploaded even if a check fails. Package diagnostics include the generated EXE configuration, captured process output, and Launcher logs from an isolated test profile; text diagnostics are also printed in the workflow log.
 4. Creates a draft Release for the exact built commit, uploads both ZIPs and checksums, then publishes it as the latest stable release.
 
 Release tags are `stable-<workflow run number>` (for example, `stable-1`), separate from the application version in `build.gradle.kts`. Each new run gets its own Release even if the application version has not changed. Retrying the same run updates its existing Release and replaces the same asset names. Releases are published only after build, tests, and package checks succeed; interrupted first-time uploads leave a draft.

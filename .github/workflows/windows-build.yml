@@ -44,20 +44,42 @@ jobs:
           if ($packages.Count -ne 1 -or $launchers.Count -ne 1) {
             throw 'Expected one portable ZIP and one Launcher ZIP.'
           }
-          $portableDir = Join-Path $env:RUNNER_TEMP 'AnySound portable 中文'
+          $diagnostics = Join-Path $env:GITHUB_WORKSPACE 'build/reports/package-check'
+          New-Item -ItemType Directory -Force $diagnostics | Out-Null
+          $env:JAVA_TOOL_OPTIONS += ' "-Danysound.dataDir=' + (Join-Path $diagnostics 'profile') + '"'
+          # Java 21's jpackage EXE also converts its expanded JVM arguments to the
+          # system ANSI code page. Keep the install path ASCII on English runners.
+          $portableDir = Join-Path $env:RUNNER_TEMP 'AnySound portable'
           $launcherDir = Join-Path $env:RUNNER_TEMP 'AnySound launcher 中文'
-          Expand-Archive $packages[0].FullName $portableDir
-          Expand-Archive $launchers[0].FullName $launcherDir
-          $app = Start-Process (Join-Path $portableDir 'AnySound/AnySound.exe') -ArgumentList '--check' -Wait -PassThru
-          if ($app.ExitCode -ne 0) { throw "Portable preflight failed: $($app.ExitCode)" }
-          # Java 21's Windows command line uses the system ANSI code page. Set the
-          # Unicode working directory in PowerShell, then pass an ASCII JAR name.
-          Push-Location (Join-Path $launcherDir 'AnySound')
           try {
-            & java -jar anysound-launcher.jar --check
-            if ($LASTEXITCODE -ne 0) { throw 'Launcher preflight failed.' }
+            Expand-Archive $packages[0].FullName $portableDir
+            Expand-Archive $launchers[0].FullName $launcherDir
+            Copy-Item (Join-Path $portableDir 'AnySound/app/AnySound.cfg') (Join-Path $diagnostics 'portable-config.txt')
+            $app = Start-Process (Join-Path $portableDir 'AnySound/AnySound.exe') -ArgumentList '--check' -PassThru `
+              -RedirectStandardOutput (Join-Path $diagnostics 'portable-stdout.txt') `
+              -RedirectStandardError (Join-Path $diagnostics 'portable-stderr.txt')
+            $null = $app.Handle
+            if (-not $app.WaitForExit(60000)) {
+              Stop-Process -Id $app.Id -Force
+              throw 'Portable preflight timed out after 60 seconds.'
+            }
+            $app.WaitForExit()
+            if ($app.ExitCode -ne 0) { throw "Portable preflight failed: $($app.ExitCode); see package-check-logs." }
+            # Keep Unicode coverage for the standalone Launcher: PowerShell sets
+            # the working directory, while Java receives an ASCII JAR filename.
+            Push-Location (Join-Path $launcherDir 'AnySound')
+            try {
+              & java -jar anysound-launcher.jar --check *> (Join-Path $diagnostics 'launcher-output.txt')
+              if ($LASTEXITCODE -ne 0) { throw 'Launcher preflight failed; see package-check-logs.' }
+            } finally {
+              Pop-Location
+            }
           } finally {
-            Pop-Location
+            Get-ChildItem $diagnostics -Filter '*.txt' -Recurse | ForEach-Object {
+              Write-Host "::group::$($_.Name)"
+              Get-Content $_.FullName -Encoding utf8
+              Write-Host '::endgroup::'
+            }
           }
           Get-ChildItem build/distributions/*.zip | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -105,3 +127,9 @@ jobs:
             build/reports/tests/test
             anysound-launcher/build/reports/tests/test
           if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-check-logs
+          path: build/reports/package-check
+          if-no-files-found: ignore

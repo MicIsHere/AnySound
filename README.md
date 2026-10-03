@@ -18,6 +18,8 @@ Quest / PICO 需要串流到电脑，并通过 SteamVR 运行 VRChat。目前不
 
 使用 Windows 便携 ZIP 包时，完整解压后打开 `AnySound\AnySound.exe` 即可，**无需另外安装 Java**。请保留解压后的整个文件夹；本地识别模型在应用内单独下载。
 
+建议放在 `C:\Apps\AnySound` 等英文路径。部分 Windows 区域设置下，中文安装路径可能导致便携包无法启动。
+
 <details>
 <summary>如果你拿到的是 Launcher（JAR）版本</summary>
 
