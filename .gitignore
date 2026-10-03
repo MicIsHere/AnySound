@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+.idea/
+*.iml
+.DS_Store
+.env
+.env.*
+!.env.example
+models/
+local.properties
+*.log
+hs_err_pid*
+replay_pid*

@@ -1,0 +1,34 @@
+# Function order from Valve OpenVR v2.5.1, IVRInput_010.
+# https://github.com/ValveSoftware/openvr/blob/v2.5.1/headers/openvr_capi.h
+SetActionManifestPath
+GetActionSetHandle
+GetActionHandle
+GetInputSourceHandle
+UpdateActionState
+GetDigitalActionData
+GetAnalogActionData
+GetPoseActionDataRelativeToNow
+GetPoseActionDataForNextFrame
+GetSkeletalActionData
+GetDominantHand
+SetDominantHand
+GetBoneCount
+GetBoneHierarchy
+GetBoneName
+GetSkeletalReferenceTransforms
+GetSkeletalTrackingLevel
+GetSkeletalBoneData
+GetSkeletalSummaryData
+GetSkeletalBoneDataCompressed
+DecompressSkeletalBoneData
+TriggerHapticVibrationAction
+GetActionOrigins
+GetOriginLocalizedName
+GetOriginTrackedDeviceInfo
+GetActionBindingInfo
+ShowActionOrigins
+ShowBindingsForActionSet
+GetComponentStateForBinding
+IsUsingLegacyInput
+OpenBindingUI
+GetBindingVariant

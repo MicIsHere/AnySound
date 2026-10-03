@@ -1,0 +1,14 @@
+{
+  "action_sets": [{"name": "/actions/anysound", "usage": "single"}],
+  "actions": [
+    {"name": "/actions/anysound/in/ptt", "type": "boolean", "requirement": "suggested"},
+    {"name": "/actions/anysound/in/confirm", "type": "boolean", "requirement": "optional"},
+    {"name": "/actions/anysound/in/cancel", "type": "boolean", "requirement": "suggested"},
+    {"name": "/actions/anysound/in/toggle_overlay", "type": "boolean", "requirement": "optional"}
+  ],
+  "default_bindings": [{"controller_type": "oculus_touch", "binding_url": "bindings_touch.json"}],
+  "localization": [
+    {"language_tag": "en_US", "/actions/anysound": "AnySound", "/actions/anysound/in/ptt": "Hold to transcribe", "/actions/anysound/in/confirm": "Confirm text", "/actions/anysound/in/cancel": "Cancel recording and pending messages", "/actions/anysound/in/toggle_overlay": "Toggle overlay"},
+    {"language_tag": "zh_CN", "/actions/anysound": "AnySound", "/actions/anysound/in/ptt": "按住转文字", "/actions/anysound/in/confirm": "确认发送", "/actions/anysound/in/cancel": "取消录音和待发消息", "/actions/anysound/in/toggle_overlay": "显示或隐藏覆盖层"}
+  ]
+}

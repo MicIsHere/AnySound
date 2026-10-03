@@ -1,0 +1,8 @@
+{
+  "action_manifest_version": 0,
+  "app_key": "io.anysound.desktop",
+  "controller_type": "oculus_touch",
+  "description": "Choose your own buttons in SteamVR. No buttons are assigned until you configure them.",
+  "name": "AnySound · 自定义按键",
+  "bindings": {"/actions/anysound": {"sources": [], "poses": [], "haptics": [], "skeleton": []}}
+}
